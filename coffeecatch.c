@@ -521,12 +521,11 @@ static void coffeecatch_fp_backtrace(native_code_handler_struct *const t,
   if (uc == NULL) {
     return;
   }
+  t->frames[t->frames_size++] = t->pc;
 #if defined(__aarch64__)
-  t->frames[t->frames_size++] = (uintptr_t) uc->uc_mcontext->__ss.__pc;
   lr = (uintptr_t) uc->uc_mcontext->__ss.__lr;
   fp = (uintptr_t) uc->uc_mcontext->__ss.__fp;
 #elif defined(__x86_64__)
-  t->frames[t->frames_size++] = (uintptr_t) uc->uc_mcontext->__ss.__rip;
   fp = (uintptr_t) uc->uc_mcontext->__ss.__rbp;
 #else
 #error "USE_FRAMEPOINTER: unsupported architecture"
