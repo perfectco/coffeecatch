@@ -506,16 +506,17 @@ static void coffeecatch_mark_alarm(native_code_handler_struct *const t) {
 /* Walk the frame-pointer chain from the trapping context. Both the arm64 and
  * x86-64 ABIs store [saved fp][return address] at the frame pointer, so one
  * loop covers both. Pure memory reads keep it async-signal-safe; a garbage
- * link faults into the unwind_guarded jump rather than reading wild memory. */
+ * link faults into the unwind_guarded jump rather than reading wild memory.
+ *
+ * A frameless leaf (one that makes no calls) never spills its return address,
+ * so its immediate caller lives only in LR and is not recovered here -- the
+ * walk resumes from the caller's frame. LR is not consulted: once a function
+ * has made any call, LR holds a stale in-function address a frame walk cannot
+ * tell from a real return, so a missing frame is preferred to a fabricated one. */
 static void coffeecatch_fp_backtrace(native_code_handler_struct *const t,
                                      void *const sc) {
   const ucontext_t *const uc = (const ucontext_t*) sc;
   uintptr_t fp;
-#if defined(__aarch64__)
-  /* If the trapping function is a leaf, it has not spilled its return address,
-   * so the immediate caller lives only in LR, not in the frame chain. */
-  uintptr_t lr;
-#endif
 
   t->frames_size = 0;
   if (uc == NULL) {
@@ -523,7 +524,6 @@ static void coffeecatch_fp_backtrace(native_code_handler_struct *const t,
   }
   t->frames[t->frames_size++] = t->pc;
 #if defined(__aarch64__)
-  lr = (uintptr_t) uc->uc_mcontext->__ss.__lr;
   fp = (uintptr_t) uc->uc_mcontext->__ss.__fp;
 #elif defined(__x86_64__)
   fp = (uintptr_t) uc->uc_mcontext->__ss.__rbp;
@@ -538,20 +538,6 @@ static void coffeecatch_fp_backtrace(native_code_handler_struct *const t,
     const uintptr_t *const frame = (const uintptr_t*) fp;
     const uintptr_t next_fp = frame[0];
     const uintptr_t ret = frame[1];
-#if defined(__aarch64__)
-    /* Emit LR once, ahead of the first spilled return address, unless the
-     * frame already spilled that same value (non-leaf) -- then it would
-     * duplicate the entry the walk is about to add. */
-    if (lr != 0) {
-      if (lr != ret) {
-        t->frames[t->frames_size++] = lr;
-      }
-      lr = 0;
-      if (t->frames_size == BACKTRACE_FRAMES_MAX) {
-        break;
-      }
-    }
-#endif
     if (ret != 0) {
       t->frames[t->frames_size++] = ret;
     }

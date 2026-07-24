@@ -441,7 +441,10 @@ static NOINLINE int check_backtrace(int in_leaf) {
   CHECK(size > 2);
 #if defined(HAVE_BACKTRACE_NAMES)
   CHECK(bt_saw_crash == 1);
-  CHECK(bt_saw_mid);
+#if defined(__arm64__)
+  if (!in_leaf) /* bt_mid() won't appear for aarch64; leaf lacks stack frame */
+#endif
+    CHECK(bt_saw_mid);
 #endif
   return 0;
 }
