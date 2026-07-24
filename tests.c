@@ -412,13 +412,13 @@ static NOINLINE void bt_crash_leaf(void) { CRASH(); }
 static NOINLINE void bt_mid(int in_leaf) {
 #if defined (__aarch64__)
   if (in_leaf) {
-    bt_crash_leaf(); /* crash in leaf; use LR to recover crash site. */
+    bt_crash_leaf(); /* crash in leaf; BT will skip immediate caller. */
   } else
 #else
   (void)in_leaf;
 #endif
   {
-    bt_crash(); /* aarch64: crash in non-leaf; LR -> spurious bt entry. */
+    bt_crash(); /* aarch64: crash in non-leaf, all callers present. */
   }
   bt_sink++; /* prevent tail-call to crash(), generating recoverable frame. */
  }
